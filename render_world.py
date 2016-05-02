@@ -17,11 +17,11 @@ def draw_boarder(screen, tup_game_size):
     pygame.draw.line(screen, rgb_stainless, [0, y_max], [0, 0], width)
 
 
-def move_circle(arr_circle, speed):
+def move_ball_center(arr_center, speed):
     speed_x = speed[0]
     speed_y = speed[1]
-    arr_circle[0] = arr_circle[0] + speed_x
-    arr_circle[1] = arr_circle[1] + speed_y
+    arr_center[0] = arr_center[0] + speed_x
+    arr_center[1] = arr_center[1] + speed_y
 
 
 # Initiate game
@@ -58,6 +58,7 @@ while True:
     if ball_center[1] < 0 or ball_center[1] > HEIGHT:
         speed[1] = -speed[1]
         
+    move_ball_center(ball_center, speed)
     screen.fill(BLACK)
     draw_boarder(screen, tup_game_size)
     pygame.draw.circle(screen, color, ball_center, radius)

@@ -16,6 +16,13 @@ def draw_boarder(screen, tup_game_size):
     pygame.draw.line(screen, rgb_stainless, [0, y_max], [0, 0], width)
 
 
+def move_circle(arr_circle, speed):
+    speed_x = speed[0]
+    speed_y = speed[1]
+    arr_circle[0] = arr_circle[0] + speed_x
+    arr_circle[1] = arr_circle[1] + speed_y
+
+
 # Initiate game
 pygame.init()
 game_title = 'Bouncing ball'
@@ -23,15 +30,17 @@ pygame.display.set_caption(game_title)
 
 WIDTH = 600
 HEIGHT = 600
+BLACK = (0, 0, 0)
+speed = [2, 3]
 tup_game_size = (WIDTH, HEIGHT)
 screen = pygame.display.set_mode(tup_game_size)
 
 # Draw game boarder
 draw_boarder(screen, tup_game_size)
 color = (192,192,192)
-pos = (40, 30)
+ball_center = [40, 30]
 radius = 10
-pygame.draw.circle(screen, color, pos, radius)
+pygame.draw.circle(screen, color, ball_center, radius)
 
 while True:
 
@@ -40,4 +49,14 @@ while True:
             pygame.quit()
             sys.exit()
 
+    move_circle(ball_center, speed)
+    if ball_center[0] < 0 or ball_center[0] > WIDTH:
+        speed[0] = -speed[0]
+    if ball_center[1] < 0 or ball_center[1] > HEIGHT:
+        speed[1] = -speed[1]
+        
+    screen.fill(BLACK)
+    draw_boarder(screen, tup_game_size)
+    pygame.draw.circle(screen, color, ball_center, radius)
     pygame.display.update()
+    #pygame.display.flip()

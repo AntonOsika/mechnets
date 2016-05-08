@@ -7,7 +7,10 @@ out_dim = 2
 
 N1 = 6
 rate = 0.5
+discount = 0.5
 batchsize = 128
+batches = 8
+memsize = batchsize*batches
 
 graph = tf.Graph()
 with graph.as_default():
@@ -19,7 +22,7 @@ with graph.as_default():
     biases1 = tf.Variable(tf.zeros([N1]))
 
     # Only use the state_dim state variables 
-    h1 = tf.nn.softmax(tf.matmul(startstate, weights1) + biases1)
+    h1 = tf.nn.sigmoid(tf.matmul(startstate, weights1) + biases1)
 
     weights2 = tf.Variable( tf.random_normal([N1, out_dim]))
     biases2 = tf.Variable(tf.zeros([out_dim]))
@@ -33,7 +36,11 @@ with graph.as_default():
     Qbest = tf.maximum(Qvals[:, 0], Qvals[:, 1])
 
     singlestate = tf.placeholder(tf.float32, shape=(1,state_dim))
-    action = tf.argmax( tf.matmul( tf.matmul(singlestate, weights1) + biases1, weights2) + biases2, 1)
+    tf_action = tf.argmax( tf.matmul( tf.nn.sigmoid(tf.matmul(singlestate, weights1) + biases1), weights2) + biases2, 1)
+
+    startstate_test = tf.placeholder(tf.float32, shape=(memsize, state_dim))
+    Qvals_test = tf.matmul( tf.nn.sigmoid(tf.matmul(startstate_test, weights1) + biases1), weights2) + biases2
+    Qbest_test = tf.maximum(Qvals_test[:, 0], Qvals_test[:, 1])
 
 import gym
 
@@ -41,42 +48,56 @@ env = gym.make('CartPole-v0')
 eps1 = 0.25
 steps = 801
 
-batches = 8
-memsize = batchsize*batches
 states1 = np.zeros((memsize, state_dim ))     #With action taken
-states1 = np.zeros((memsize), dtype='bool_')     #With action taken
+actions = np.zeros((memsize), dtype='bool_')     #With action taken
 states2 = np.zeros((memsize, state_dim + 1))    #With reward
 pos = 0
 done = False
 state = env.reset()
+l = 0
 
 with tf.Session(graph=graph) as session:
-    for step in range(steps):
+    tf.initialize_all_variables().run()
+    for step in xrange(steps):
         eps = (1 - step/(steps-1))*eps1
-        for pos in range(batchsize):
-            for i in range( batches ):
-                if done:
-                    state = env.reset()
-                if np.random.rand() < eps:
-                    action = np.random.randint() % 2
-                else:
-                    action = session.run(action, feed_dict={ singlestate:state })
+        if step % 100 == 0:
+            for pos in xrange(batchsize):
+                for i in xrange( batches ):
+                    if done:
+                        state = env.reset()
+                    if np.random.rand() < eps:
+                        action = np.random.randint(0, 2)
+                    else:
+                        action = session.run(tf_action, feed_dict={ singlestate:state[np.newaxis, :] })
 
-                states1[pos +i*batchsize, :] = state
-                actions[pos +i*batchsize] = action
+                    states1[pos +i*batchsize, :] = state
+                    actions[pos +i*batchsize] = action
 
-                observation, reward, done, info = env.step(action)
+                    state, reward, done, info = env.step(action)
 
-                if done:
-                    reward += -10
+                    if done:
+                        reward += -10
 
-                states2[pos +i*batchsize, :state_dim] = state
-                states2[pos +i*batchsize, state_dim] = reward
-        for batch in range(batches):
+                    states2[pos +i*batchsize, :state_dim] = state
+                    states2[pos +i*batchsize, state_dim] = reward
+
+                    if step +1 == steps:
+                        env.render()
+
+        if step % 100 == 0:
+            # Average actual Q over all data
+            Qhat = session.run([Qbest_test], feed_dict={ startstate_test:states2[:,:state_dim] }) + states2[:, state_dim]
+            print("Loss at step", step, ":", l)
+            print("Avg Q:", Qhat.mean())
+
+        for batch in xrange(batches):
             # Future max Q + reward:
             offset = batch*batchsize
-            Qtrue = session.run(Qbest, feed_dict={ startstate:states2[offset:(offset+batchsize),:state_dim] }) + states2[offset:(offset+batchsize), state_dim]
-            _, l = session.run([optimizer, loss], feed_dict={startstate:states1[offset:(offset+batchsize), :state_dim], actiontaken:states1[offset:(offset+batchsize), -1], Qtrue:Qtrue})
-            if step % 100 == 0:
-                print("Loss at step", step, ":", l)
-                print("Avg Q:", Qtrue.mean())
+            Qhat = session.run(Qbest, feed_dict={ startstate:states2[offset:(offset+batchsize),:state_dim] }) + discount*states2[offset:(offset+batchsize), state_dim]
+            _, l = session.run([optimizer, loss], feed_dict={startstate:states1[offset:(offset+batchsize), :state_dim], actiontaken:states1[offset:(offset+batchsize), -1], Qtrue:Qhat})
+
+        if (step + 1) % 100 == 0:
+            # Average actual Q over all data
+            Qhat = session.run([Qbest_test], feed_dict={ startstate_test:states2[:,:state_dim] }) + states2[:, state_dim]
+            print("Loss at step", step, ":", l)
+            print("Avg Q:", Qhat.mean())

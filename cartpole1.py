@@ -5,7 +5,8 @@ state_dim = 4
 #action_dim = 1
 out_dim = 2
 
-N1 = 6
+N1 = 3
+N1 = 3
 rate = 0.5
 discount = 0.5
 batchsize = 128
@@ -55,7 +56,7 @@ pos = 0
 done = False
 state = env.reset()
 l = 0
-
+counter = 0
 with tf.Session(graph=graph) as session:
     tf.initialize_all_variables().run()
     for step in xrange(steps):
@@ -83,6 +84,9 @@ with tf.Session(graph=graph) as session:
 
                     if step +1 == steps:
                         env.render()
+                        if done:
+                            counter += 1
+                            print("died ", counter)
 
         if step % 100 == 0:
             # Average actual Q over all data
